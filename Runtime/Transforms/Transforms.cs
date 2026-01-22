@@ -238,7 +238,28 @@ namespace UVis.Transforms
             if (_sortFields.Count == 0)
                 return data;
 
-            return data.OrderBy(row => 0, new MultiFieldComparer(_sortFields, data)).ToList();
+            IOrderedEnumerable<Dictionary<string, object>> ordered = null;
+
+            for (int i = 0; i < _sortFields.Count; i++)
+            {
+                var field = _sortFields[i];
+                bool descending = field.order?.ToLower() == "descending";
+
+                if (i == 0)
+                {
+                    ordered = descending
+                        ? data.OrderByDescending(r => GetSortValue(r, field.field))
+                        : data.OrderBy(r => GetSortValue(r, field.field));
+                }
+                else
+                {
+                    ordered = descending
+                        ? ordered.ThenByDescending(r => GetSortValue(r, field.field))
+                        : ordered.ThenBy(r => GetSortValue(r, field.field));
+                }
+            }
+
+            return ordered?.ToList() ?? data;
         }
 
         private class MultiFieldComparer : IComparer<int>

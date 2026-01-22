@@ -9,6 +9,11 @@ using UVis.Scales;
 using UVis.Transforms;
 using UVis.Marks;
 using UVis.Layout;
+using UVis.Data;
+
+#if DATACORE_INSTALLED
+using AroAro.DataCore.Events;
+#endif
 
 namespace UVis.Core
 {
@@ -55,6 +60,12 @@ namespace UVis.Core
         private LayoutCalculator _layoutCalculator;
         private RectTransform _plotAreaRect;
         private List<Dictionary<string, object>> _processedData;
+        
+        // DataCore sync state
+        private string _boundDataset;
+        private bool _isSyncEnabled;
+        private float _lastSyncTime;
+        private const float SYNC_DEBOUNCE_SECONDS = 0.1f;
 
         /// <summary>
         /// Current render mode.
@@ -134,6 +145,9 @@ namespace UVis.Core
                 // Parse specification
                 _currentSpec = SpecParser.Parse(json);
                 OnSpecChanged?.Invoke(_currentSpec);
+                
+                // Load data from external sources (e.g., DataCore dc:// URLs)
+                LoadDataFromSource(_currentSpec);
 
                 // Clear previous render
                 Clear();
@@ -168,6 +182,7 @@ namespace UVis.Core
                 // Render marks
                 var context = new MarkRenderContext
                 {
+                    Spec = _currentSpec,
                     Data = _processedData,
                     Encoding = _currentSpec.encoding,
                     XScale = xScale,
@@ -511,6 +526,89 @@ namespace UVis.Core
         private void OnValidate()
         {
             // Editor preview could be added here
+        }
+#endif
+
+        private void OnDestroy()
+        {
+            UnsubscribeFromDataChanges();
+        }
+
+        /// <summary>
+        /// Load data from external sources (e.g., DataCore dc:// URLs).
+        /// </summary>
+        private void LoadDataFromSource(ChartSpec spec)
+        {
+            // Unsubscribe from previous dataset if any
+            UnsubscribeFromDataChanges();
+
+            if (spec?.data == null)
+                return;
+
+            // Check for DataCore URL
+            if (DataCoreDataLoader.CanHandle(spec.data.url))
+            {
+                // Parse dataset name for sync subscription
+                var (datasetName, _) = DataCoreDataLoader.ParseUrl(spec.data.url);
+                
+                // Load data from DataCore
+                DataCoreDataLoader.PopulateSpec(spec.data);
+                
+                // Setup sync if enabled
+                if (DataCoreDataLoader.IsSyncEnabled(spec.data.url, spec.data))
+                {
+                    SubscribeToDataChanges(datasetName);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Subscribe to DataCore dataset changes for live sync.
+        /// </summary>
+        private void SubscribeToDataChanges(string datasetName)
+        {
+#if DATACORE_INSTALLED
+            _boundDataset = datasetName;
+            _isSyncEnabled = true;
+            DataCoreEventManager.DatasetModified += OnDatasetModified;
+            Debug.Log($"[UVis] Subscribed to DataCore changes for '{datasetName}'");
+#endif
+        }
+
+        /// <summary>
+        /// Unsubscribe from DataCore dataset changes.
+        /// </summary>
+        private void UnsubscribeFromDataChanges()
+        {
+#if DATACORE_INSTALLED
+            if (_isSyncEnabled)
+            {
+                DataCoreEventManager.DatasetModified -= OnDatasetModified;
+                Debug.Log($"[UVis] Unsubscribed from DataCore changes for '{_boundDataset}'");
+            }
+#endif
+            _boundDataset = null;
+            _isSyncEnabled = false;
+        }
+
+#if DATACORE_INSTALLED
+        /// <summary>
+        /// Handle DataCore dataset modification events.
+        /// </summary>
+        private void OnDatasetModified(object sender, DatasetModifiedEventArgs e)
+        {
+            if (e.DatasetName != _boundDataset)
+                return;
+
+            // Debounce to prevent excessive re-renders
+            if (Time.time - _lastSyncTime < SYNC_DEBOUNCE_SECONDS)
+                return;
+
+            _lastSyncTime = Time.time;
+            Debug.Log($"[UVis] Dataset '{e.DatasetName}' modified (op: {e.Operation}), re-rendering...");
+            
+            // Re-render chart with updated data
+            Render();
         }
 #endif
     }

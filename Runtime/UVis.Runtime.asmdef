@@ -2,7 +2,8 @@
     "name": "UVis.Runtime",
     "rootNamespace": "UVis",
     "references": [
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "AroAro.DataCore"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -11,6 +12,11 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.aroaro.datacore",
+            "define": "DATACORE_INSTALLED"
+        }
+    ],
     "noEngineReferences": false
 }

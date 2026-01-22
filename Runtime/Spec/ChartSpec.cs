@@ -14,20 +14,43 @@ namespace UVis.Spec
         public EncodingSpec encoding { get; set; }
         public int width { get; set; } = 640;
         public int height { get; set; } = 400;
+        public int depth { get; set; } = 0;  // 3D depth (Z-axis). 0 = use width as default
         public PaddingSpec padding { get; set; }
         public AxisContainerSpec axis { get; set; }
         public LegendContainerSpec legend { get; set; }
         public List<TransformSpec> transform { get; set; }
+        
+        // Graph-specific properties
+        public LayoutSpec layout { get; set; }
+        public InteractionSpec interaction { get; set; }
     }
 
     /// <summary>
     /// Data specification containing values or URL reference.
+    /// For graphs, use nodes and edges arrays.
+    /// Supports dc:// URLs for DataCore integration.
     /// </summary>
     [Serializable]
     public class DataSpec
     {
         public List<Dictionary<string, object>> values { get; set; }
+        
+        /// <summary>
+        /// URL to load data from. Supports:
+        /// - dc://dataset-name for DataCore datasets
+        /// - dc://dataset-name?sync=true&amp;where=value&gt;10 for filtered/synced data
+        /// </summary>
         public string url { get; set; }
+        
+        /// <summary>
+        /// Enable live data binding. When true, chart re-renders when data source changes.
+        /// Can also be set via URL param: dc://dataset?sync=true
+        /// </summary>
+        public bool sync { get; set; } = false;
+        
+        // Graph data
+        public List<Dictionary<string, object>> nodes { get; set; }
+        public List<Dictionary<string, object>> edges { get; set; }
     }
 
     /// <summary>
@@ -64,8 +87,38 @@ namespace UVis.Spec
         public ChannelSpec color { get; set; }
         public ChannelSpec size { get; set; }
         public ChannelSpec shape { get; set; }  // Shape for 3D scatter: sphere, cube, cylinder, capsule, prefab:Name
+        
+        // Graph-specific encoding
+        public NodeEncodingSpec node { get; set; }
+        public EdgeEncodingSpec edge { get; set; }
     }
 
+    /// <summary>
+    /// Node encoding specification for graph marks.
+    /// </summary>
+    [Serializable]
+    public class NodeEncodingSpec
+    {
+        public ChannelSpec x { get; set; }
+        public ChannelSpec y { get; set; }
+        public ChannelSpec z { get; set; }
+        public ChannelSpec size { get; set; }
+        public ChannelSpec color { get; set; }
+        public ChannelSpec shape { get; set; }
+        public ChannelSpec label { get; set; }
+    }
+
+    /// <summary>
+    /// Edge encoding specification for graph marks.
+    /// </summary>
+    [Serializable]
+    public class EdgeEncodingSpec
+    {
+        public ChannelSpec width { get; set; }
+        public ChannelSpec color { get; set; }
+        public ChannelSpec style { get; set; }  // solid, dashed, dotted
+        public ChannelSpec curvature { get; set; }
+    }
 
     /// <summary>
     /// Channel specification for a single encoding.
@@ -211,7 +264,8 @@ namespace UVis.Spec
     {
         Bar,
         Line,
-        Point
+        Point,
+        Graph
     }
 
     /// <summary>
@@ -260,8 +314,102 @@ namespace UVis.Spec
                 "bar" => MarkType.Bar,
                 "line" => MarkType.Line,
                 "point" => MarkType.Point,
+                "graph" => MarkType.Graph,
                 _ => MarkType.Bar
             };
         }
+    }
+
+    /// <summary>
+    /// Layout specification for graph visualizations.
+    /// </summary>
+    [Serializable]
+    public class LayoutSpec
+    {
+        public string type { get; set; } = "force"; // force, circular, hierarchical, grid, radial, random, preset
+        public LayoutParams @params { get; set; }
+    }
+
+    [Serializable]
+    public class LayoutParams
+    {
+        // Force layout
+        public int iterations { get; set; } = 100;
+        public float repulsion { get; set; } = 100f;
+        public float attraction { get; set; } = 0.1f;
+        public float damping { get; set; } = 0.9f;
+        public float gravity { get; set; } = 0.1f;
+        
+        // Circular layout
+        public float radius { get; set; } = 2f;
+        public float startAngle { get; set; } = 0f;
+        public float endAngle { get; set; } = 360f;
+        public string sortBy { get; set; }
+        
+        // Hierarchical layout
+        public string direction { get; set; } = "TB"; // TB, BT, LR, RL
+        public float levelSeparation { get; set; } = 1f;
+        public float nodeSeparation { get; set; } = 0.5f;
+        public string rootNode { get; set; }
+        
+        // Grid layout
+        public int columns { get; set; } = 5;
+        public float spacing { get; set; } = 1f;
+    }
+
+    /// <summary>
+    /// Interaction specification for VR/MR interaction.
+    /// </summary>
+    [Serializable]
+    public class InteractionSpec
+    {
+        public NodeInteractionSpec node { get; set; }
+        public EdgeInteractionSpec edge { get; set; }
+        public GlobalInteractionSpec global { get; set; }
+    }
+
+    [Serializable]
+    public class NodeInteractionSpec
+    {
+        public bool draggable { get; set; } = true;
+        public bool hoverable { get; set; } = true;
+        public bool selectable { get; set; } = true;
+        public TooltipSpec hoverTooltip { get; set; }
+        public HighlightSpec highlight { get; set; }
+    }
+
+    [Serializable]
+    public class EdgeInteractionSpec
+    {
+        public bool hoverable { get; set; } = true;
+        public bool selectable { get; set; } = false;
+        public TooltipSpec hoverTooltip { get; set; }
+        public HighlightSpec highlight { get; set; }
+    }
+
+    [Serializable]
+    public class GlobalInteractionSpec
+    {
+        public string inputMode { get; set; } = "pointer"; // pointer, controller, hand
+        public bool multiSelect { get; set; } = false;
+    }
+
+    [Serializable]
+    public class TooltipSpec
+    {
+        public List<string> fields { get; set; }
+        public string format { get; set; }
+        public string position { get; set; } = "above"; // above, side, follow
+        public float delay { get; set; } = 0.3f;
+    }
+
+    [Serializable]
+    public class HighlightSpec
+    {
+        public float scale { get; set; } = 1.2f;
+        public string color { get; set; }
+        public bool outline { get; set; } = false;
+        public string outlineColor { get; set; } = "#ffffff";
+        public float outlineWidth { get; set; } = 0.02f;
     }
 }

@@ -142,9 +142,22 @@ namespace UVis.Spec
         /// </summary>
         private static void Validate(ChartSpec spec)
         {
-            if (spec.data.values == null || spec.data.values.Count == 0)
+            bool isGraph = spec.mark?.ToLower() == "graph";
+            
+            // Graph marks use nodes/edges, other marks use values
+            if (isGraph)
             {
-                Debug.LogWarning("[UVis] Chart specification has no data values");
+                if ((spec.data.nodes == null || spec.data.nodes.Count == 0))
+                {
+                    Debug.LogWarning("[UVis] Graph specification has no data.nodes array");
+                }
+            }
+            else
+            {
+                if (spec.data.values == null || spec.data.values.Count == 0)
+                {
+                    Debug.LogWarning("[UVis] Chart specification has no data values");
+                }
             }
 
             if (string.IsNullOrEmpty(spec.mark))
@@ -153,7 +166,8 @@ namespace UVis.Spec
                 spec.mark = "bar";
             }
 
-            if (spec.encoding.x == null && spec.encoding.y == null)
+            // Graph marks don't require x/y encoding
+            if (!isGraph && spec.encoding.x == null && spec.encoding.y == null)
             {
                 Debug.LogWarning("[UVis] No x or y encoding specified");
             }

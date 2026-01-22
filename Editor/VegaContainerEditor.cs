@@ -1,6 +1,12 @@
 using UnityEngine;
 using UnityEditor;
 using UVis.Core;
+using UVis.Data;
+using System.Collections.Generic;
+
+#if DATACORE_INSTALLED
+using AroAro.DataCore;
+#endif
 
 namespace UVis.Editor
 {
@@ -187,6 +193,10 @@ namespace UVis.Editor
 
         private bool _showJsonEditor = true;
         private Vector2 _jsonScrollPos;
+        
+        // DataCore UI state
+        private bool _showDataCoreSection = true;
+        private Vector2 _datasetScrollPos;
 
         private static readonly string[] TEMPLATE_NAMES = new string[]
         {
@@ -195,6 +205,7 @@ namespace UVis.Editor
             "Grouped Bar Chart",
             "3D Bar Chart",
             "3D Scatter Plot",
+            "Graph (Force Layout)",
             "Color Scale Demo",
             "Line Chart",
             "Scatter Plot",
@@ -300,7 +311,8 @@ namespace UVis.Editor
     ""color"": {""field"": ""category"", ""type"": ""nominal""}
   },
   ""width"": 500,
-  ""height"": 350
+  ""height"": 350,
+  ""depth"": 500
 }",
             // 3D Scatter Plot (requires WorldSpace3D mode)
             @"{
@@ -332,7 +344,47 @@ namespace UVis.Editor
     ""shape"": {""field"": ""category"", ""type"": ""nominal""}
   },
   ""width"": 400,
-  ""height"": 400
+  ""height"": 400,
+  ""depth"": 400
+}",
+            // Graph (Force Layout) - requires WorldSpace3D mode
+            @"{
+  ""title"": ""Social Network Graph"",
+  ""mark"": ""graph"",
+  ""data"": {
+    ""nodes"": [
+      {""id"": ""alice"", ""label"": ""Alice"", ""dept"": ""Eng"", ""level"": 3},
+      {""id"": ""bob"", ""label"": ""Bob"", ""dept"": ""Eng"", ""level"": 2},
+      {""id"": ""carol"", ""label"": ""Carol"", ""dept"": ""Mkt"", ""level"": 2},
+      {""id"": ""david"", ""label"": ""David"", ""dept"": ""Sales"", ""level"": 1},
+      {""id"": ""emma"", ""label"": ""Emma"", ""dept"": ""Mkt"", ""level"": 2},
+      {""id"": ""frank"", ""label"": ""Frank"", ""dept"": ""Eng"", ""level"": 1}
+    ],
+    ""edges"": [
+      {""source"": ""alice"", ""target"": ""bob"", ""weight"": 8},
+      {""source"": ""alice"", ""target"": ""carol"", ""weight"": 5},
+      {""source"": ""bob"", ""target"": ""frank"", ""weight"": 10},
+      {""source"": ""carol"", ""target"": ""emma"", ""weight"": 7},
+      {""source"": ""carol"", ""target"": ""david"", ""weight"": 3},
+      {""source"": ""david"", ""target"": ""emma"", ""weight"": 4}
+    ]
+  },
+  ""layout"": {""type"": ""force""},
+  ""encoding"": {
+    ""node"": {
+      ""color"": {""field"": ""dept"", ""type"": ""nominal""},
+      ""label"": {""field"": ""label""}
+    },
+    ""edge"": {
+      ""width"": {""field"": ""weight"", ""type"": ""quantitative""}
+    }
+  },
+  ""interaction"": {
+    ""node"": {""draggable"": true, ""hoverable"": true}
+  },
+  ""width"": 500,
+  ""height"": 500,
+  ""depth"": 500
 }",
             // Color Scale Demo
             @"{
@@ -424,6 +476,9 @@ namespace UVis.Editor
             EditorGUILayout.LabelField("Render Settings", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(_renderModeProp);
             EditorGUILayout.Space();
+            
+            // DataCore Integration Status
+            DrawDataCoreSection();
 
             // Mode-specific settings
             var renderMode = (VegaContainer.RenderMode)_renderModeProp.enumValueIndex;
@@ -533,5 +588,157 @@ namespace UVis.Editor
 
             serializedObject.ApplyModifiedProperties();
         }
+        
+        /// <summary>
+        /// Draw the DataCore integration status section.
+        /// </summary>
+        private void DrawDataCoreSection()
+        {
+            _showDataCoreSection = EditorGUILayout.Foldout(_showDataCoreSection, "DataCore Integration", true);
+            if (!_showDataCoreSection)
+                return;
+            
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            
+#if DATACORE_INSTALLED
+            // DataCore is installed
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Status", GUILayout.Width(60));
+            
+            var statusStyle = new GUIStyle(EditorStyles.label);
+            statusStyle.normal.textColor = new Color(0.2f, 0.8f, 0.2f);
+            EditorGUILayout.LabelField("✓ DataCore Detected", statusStyle);
+            EditorGUILayout.EndHorizontal();
+            
+            // Try to get datasets
+            try
+            {
+                var storeComponent = Object.FindObjectOfType<DataCoreEditorComponent>();
+                if (storeComponent != null)
+                {
+                    var store = storeComponent.GetStore();
+                    if (store != null)
+                    {
+                        EditorGUILayout.Space(5);
+                        DrawDatasetList("Tabular Datasets", store.TabularNames, "dc://");
+                        DrawDatasetList("Graph Datasets", store.GraphNames, "dc://");
+                    }
+                    else
+                    {
+                        EditorGUILayout.HelpBox("DataCoreStore not initialized.", MessageType.Warning);
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox("DataCoreEditorComponent not found in scene. Add one to access datasets.", MessageType.Info);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                EditorGUILayout.HelpBox($"Error accessing DataCore: {ex.Message}", MessageType.Error);
+            }
+#else
+            // DataCore is not installed
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Status", GUILayout.Width(60));
+            
+            var statusStyle = new GUIStyle(EditorStyles.label);
+            statusStyle.normal.textColor = new Color(0.6f, 0.6f, 0.6f);
+            EditorGUILayout.LabelField("○ DataCore Not Installed", statusStyle);
+            EditorGUILayout.EndHorizontal();
+            
+            EditorGUILayout.HelpBox("Install com.aroaro.datacore package to enable dc:// data URLs.", MessageType.Info);
+#endif
+            
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space();
+        }
+        
+#if DATACORE_INSTALLED
+        /// <summary>
+        /// Draw a list of datasets with copy buttons.
+        /// </summary>
+        private void DrawDatasetList(string title, IEnumerable<string> names, string urlPrefix)
+        {
+            var namesList = new List<string>(names);
+            if (namesList.Count == 0)
+                return;
+            
+            EditorGUILayout.LabelField(title, EditorStyles.miniBoldLabel);
+            
+            EditorGUI.indentLevel++;
+            foreach (var name in namesList)
+            {
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField(name, GUILayout.ExpandWidth(true));
+                
+                if (GUILayout.Button("Copy URL", GUILayout.Width(70)))
+                {
+                    var url = $"{urlPrefix}{name}";
+                    EditorGUIUtility.systemCopyBuffer = url;
+                    Debug.Log($"[UVis] Copied to clipboard: {url}");
+                }
+                
+                if (GUILayout.Button("Use", GUILayout.Width(40)))
+                {
+                    // Insert dc:// URL into the spec
+                    InsertDataCoreUrl(name);
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+            EditorGUI.indentLevel--;
+            EditorGUILayout.Space(3);
+        }
+        
+        /// <summary>
+        /// Insert a dc:// URL into the current spec's data section.
+        /// </summary>
+        private void InsertDataCoreUrl(string datasetName)
+        {
+            var url = $"dc://{datasetName}?sync=true";
+            var json = _chartSpecJsonProp.stringValue;
+            
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                // Create minimal spec with dc:// URL
+                json = $@"{{
+  ""data"": {{ ""url"": ""{url}"" }},
+  ""mark"": ""bar"",
+  ""encoding"": {{
+    ""x"": {{""field"": ""category"", ""type"": ""ordinal""}},
+    ""y"": {{""field"": ""value"", ""type"": ""quantitative""}}
+  }},
+  ""width"": 640,
+  ""height"": 400
+}}";
+            }
+            else
+            {
+                // Try to update existing data.url
+                try
+                {
+                    var spec = Newtonsoft.Json.JsonConvert.DeserializeObject<UVis.Spec.ChartSpec>(json);
+                    if (spec.data == null)
+                        spec.data = new UVis.Spec.DataSpec();
+                    spec.data.url = url;
+                    spec.data.sync = true;
+                    spec.data.values = null; // Clear inline values
+                    json = Newtonsoft.Json.JsonConvert.SerializeObject(spec, Newtonsoft.Json.Formatting.Indented);
+                }
+                catch
+                {
+                    Debug.LogWarning("[UVis] Could not parse existing spec, creating new one.");
+                    json = $@"{{
+  ""data"": {{ ""url"": ""{url}"" }},
+  ""mark"": ""bar""
+}}";
+                }
+            }
+            
+            _chartSpecJsonProp.stringValue = json;
+            serializedObject.ApplyModifiedProperties();
+            Debug.Log($"[UVis] Set data source to: {url}");
+        }
+#endif
     }
 }

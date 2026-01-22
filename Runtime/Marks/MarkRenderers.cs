@@ -20,6 +20,7 @@ namespace UVis.Marks
     /// </summary>
     public class MarkRenderContext
     {
+        public ChartSpec Spec { get; set; }                  // Full spec for graph and advanced marks
         public List<Dictionary<string, object>> Data { get; set; }
         public EncodingSpec Encoding { get; set; }
         public IScale XScale { get; set; }
@@ -45,6 +46,7 @@ namespace UVis.Marks
                 MarkType.Bar => new BarMarkRenderer(),
                 MarkType.Line => new LineMarkRenderer(),
                 MarkType.Point => new PointMarkRenderer(),
+                MarkType.Graph => new GraphMarkRenderer(),
                 _ => new BarMarkRenderer()
             };
         }
