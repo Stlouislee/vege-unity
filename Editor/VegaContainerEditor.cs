@@ -209,6 +209,7 @@ namespace UVis.Editor
             "Color Scale Demo",
             "Line Chart",
             "Scatter Plot",
+            "DataCore Aggregation",
             "Custom..."
         };
 
@@ -449,6 +450,32 @@ namespace UVis.Editor
     ""color"": {""value"": ""#e15759""}
   },
   ""width"": 640,
+  ""height"": 400
+}",
+            // DataCore Aggregation (requires DataCore with california_housing_test dataset)
+            @"{
+  ""data"": {
+    ""url"": ""dc://california_housing_test?sync=true""
+  },
+  ""transform"": [
+    {
+      ""aggregate"": [
+        {""op"": ""mean"", ""field"": ""median_house_value"", ""as"": ""avg_house_value""},
+        {""op"": ""count"", ""field"": ""median_house_value"", ""as"": ""count""}
+      ],
+      ""groupby"": [""housing_median_age""]
+    },
+    {
+      ""sort"": [{""field"": ""housing_median_age"", ""order"": ""ascending""}]
+    }
+  ],
+  ""mark"": ""bar"",
+  ""encoding"": {
+    ""x"": {""field"": ""housing_median_age"", ""type"": ""ordinal"", ""title"": ""Housing Median Age""},
+    ""y"": {""field"": ""avg_house_value"", ""type"": ""quantitative"", ""title"": ""Average House Value""},
+    ""color"": {""field"": ""housing_median_age"", ""type"": ""ordinal""}
+  },
+  ""width"": 800,
   ""height"": 400
 }"
         };
